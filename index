@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高速弾幕シューティングゲーム</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a, #1a1a2e);
+            color: #fff;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            margin: 0 auto;
+            background: linear-gradient(180deg, #001122, #000011);
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 20px #00ffff;
+        }
+
+        #gameInfo {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 18px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+            z-index: 100;
+        }
+
+        #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #ff0066;
+            box-shadow: 0 0 30px #ff0066;
+            display: none;
+            z-index: 1000;
+        }
+
+        #gameOverScreen h2 {
+            color: #ff0066;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+
+        #gameOverScreen p {
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        #restartBtn {
+            background: linear-gradient(45deg, #ff0066, #ff3399);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        #restartBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #ff0066;
+        }
+
+        /* スマートフォン用コントロール */
+        #mobileControls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .joystick {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            border-radius: 50%;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick-knob {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 40px;
+            height: 40px;
+            background: #00ffff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s;
+            box-shadow: 0 0 10px #00ffff;
+        }
+
+        .shoot-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 0, 102, 0.3);
+            border: 2px solid #ff0066;
+            border-radius: 50%;
+            color: #ff0066;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: auto;
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .shoot-btn:active {
+            background: rgba(255, 0, 102, 0.5);
+            transform: scale(0.95);
+        }
+
+        /* PCでは非表示 */
+        @media (min-width: 768px) {
+            #mobileControls {
+                display: none;
+            }
+        }
+
+        /* スマートフォンでの調整 */
+        @media (max-width: 767px) {
+            #gameCanvas {
+                width: 100vw;
+                height: 100vh;
+            }
+            
+            #gameInfo {
+                font-size: 14px;
+            }
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #00ffff;
+            box-shadow: 0 0 30px #00ffff;
+            z-index: 1000;
+        }
+
+        #startScreen h1 {
+            color: #00ffff;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        #startBtn {
+            background: linear-gradient(45deg, #00ffff, #0099ff);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+
+        #startBtn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px #00ffff;
+        }
+
+        .instructions {
+            font-size: 14px;
+            margin-top: 20px;
+            color: #ccc;
+        }
+    
+        #gameContainer {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            margin: 20px auto;
+        }
+
+        #gameInfo,
+        #startScreen,
+        #gameOverScreen,
+        #mobileControls {
+            position: absolute;
+        }
+
+        @media (max-width: 767px) {
+            #gameContainer {
+                width: 100vw;
+                height: 100vh;
+            }
+        }
+
+</style>
+</head>
+<body>
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <div id="gameInfo">
+        <div>生存時間: <span id="timeDisplay">0.0</span>秒</div>
+        <div>ハイスコア: <span id="highScoreDisplay">0.0</span>秒</div>
+    </div>
+
+    <div id="startScreen">
+        <h1>高速弾幕シューティング</h1>
+        <p>敵の弾幕を避けながら生き残れ！</p>
+        <div class="instructions">
+            <p><strong>PC:</strong> WASD/矢印キーで移動、スペースキーでショット</p>
+            <p><strong>スマートフォン:</strong> 仮想ジョイスティックとボタン</p>
+        </div>
+        <button id="startBtn">ゲーム開始</button>
+    </div>
+
+    <div id="gameOverScreen">
+        <h2>ゲームオーバー</h2>
+        <p>生存時間: <span id="finalTime">0</span>秒</p>
+        <p>ハイスコア: <span id="finalHighScore">0</span>秒</p>
+        <button id="restartBtn">再挑戦</button>
+    </div>
+
+    <div id="mobileControls">
+        <div class="joystick" id="joystick">
+            <div class="joystick-knob" id="joystickKnob"></div>
+        </div>
+        <div class="shoot-btn" id="shootBtn">SHOT</div>
+    </div>
+
+    <script>
+        // ゲームオブジェクトクラス群
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 8;
+                this.shootCooldown = 0;
+                this.shootDelay = 100;
+                this.lastShot = 0;
+            }
+            
+            update() {
+                this.shootCooldown = Math.max(0, this.shootCooldown - 16);
+            }
+            
+            shoot() {
+                const now = Date.now();
+                if (now - this.lastShot > this.shootDelay) {
+                    game.bullets.push(new Bullet(this.x, this.y - 15, 0, -10, '#00ffff'));
+                    this.lastShot = now;
+                }
+            }
+            
+            render(ctx) {
+                ctx.fillStyle = '#00ffff';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - this.radius);
+                ctx.lineTo(this.x - this.radius, this.y + this.radius);
+                ctx.lineTo(this.x + this.radius, this.y + this.radius);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#00ffff';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        class Enemy {
+            constructor(x, y, type) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.radius = 12;
+                this.speed = 2 + Math.random() * 2;
+                this.angle = 0;
+                this.shootPattern = Math.floor(Math.random() * 3);
+            }
+            
+            update() {
+                this.y += this.speed;
+                this.angle += 0.1;
+                
+                switch(this.type) {
+                    case 0:
+                        break;
+                    case 1:
+                        this.x += Math.sin(this.angle) * 2;
+                        break;
+                    case 2:
+                        this.x += Math.cos(this.angle) * 1.5;
+                        break;
+                }
+            }
+            
+            shoot(player) {
+                const dx = player.x - this.x;
+                const dy = player.y - this.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                switch(this.shootPattern) {
+                    case 0:
+                        game.enemyBullets.push(new Bullet(this.x, this.y, dx/distance * 4, dy/distance * 4, '#ff0066'));
+                        break;
+                    case 1:
+                        for (let i = -1; i <= 1; i++) {
+                            const angle = Math.atan2(dy, dx) + i * 0.3;
+                            game.enemyBullets.push(new Bullet(this.x, this.y, Math.cos(angle) * 4, Math.sin(angle) * 4, '#ff0066'));
+                        }
+                        break;
+                    case 2:
+                        for (let i = 0; i < 6; i++) {
+                            const angle = (i / 6) * Math.PI * 2;
+                            game.enemyBullets.push(new Bullet(this.x, this.y, Math.cos(angle) * 3, Math.sin(angle) * 3, '#ff0066'));
+                        }
+                        break;
+                }
+            }
+            
+            render(ctx) {
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ff4444';
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        class Bullet {
+            constructor(x, y, vx, vy, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = vx;
+                this.vy = vy;
+                this.color = color;
+                this.radius = 4;
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+            
+            render(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        class Obstacle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 25;
+                this.speed = 3;
+                this.angle = 0;
+            }
+            
+            update() {
+                this.y += this.speed;
+                this.angle += 0.05;
+            }
+            
+            render(ctx) {
+                ctx.fillStyle = '#ffaa00';
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                ctx.fillRect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+                ctx.restore();
+                
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#ffaa00';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 8;
+                this.vy = (Math.random() - 0.5) * 8;
+                this.life = 1;
+                this.decay = 0.02;
+                this.color = `hsl(${Math.random() * 60 + 30}, 100%, 50%)`;
+            }
+            
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+                this.vx *= 0.98;
+                this.vy *= 0.98;
+            }
+            
+            render(ctx) {
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.life;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // メインゲームクラス
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.gameRunning = false;
+                this.gameStarted = false;
+                this.startTime = 0;
+                this.lastTime = 0;
+                this.survivalTime = 0;
+                
+                this.player = null;
+                this.enemies = [];
+                this.bullets = [];
+                this.enemyBullets = [];
+                this.obstacles = [];
+                this.particles = [];
+                
+                this.keys = {};
+                this.mobile = {
+                    joystick: { x: 0, y: 0, active: false },
+                    shooting: false
+                };
+                
+                this.difficulty = 1;
+                this.enemySpawnRate = 0.02;
+                this.bulletSpeed = 8;
+                
+                this.init();
+            }
+            
+            init() {
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.setupMobileControls();
+                this.loadHighScore();
+                this.showStartScreen();
+            }
+            
+            setupCanvas() {
+                const updateCanvasSize = () => {
+                    if (window.innerWidth < 768) {
+                        this.canvas.width = window.innerWidth;
+                        this.canvas.height = window.innerHeight;
+                    } else {
+                        this.canvas.width = 800;
+                        this.canvas.height = 600;
+                    }
+                };
+                
+                updateCanvasSize();
+                window.addEventListener('resize', updateCanvasSize);
+            }
+            
+            setupEventListeners() {
+                document.addEventListener('keydown', (e) => {
+                    this.keys[e.key.toLowerCase()] = true;
+                    this.keys[e.code] = true;
+                    if (e.key === ' ') e.preventDefault();
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    this.keys[e.key.toLowerCase()] = false;
+                    this.keys[e.code] = false;
+                });
+                
+                document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+                document.getElementById('restartBtn').addEventListener('click', () => this.startGame());
+            }
+            
+            setupMobileControls() {
+                const joystick = document.getElementById('joystick');
+                const joystickKnob = document.getElementById('joystickKnob');
+                const shootBtn = document.getElementById('shootBtn');
+                
+                const handleJoystickStart = (e) => {
+                    e.preventDefault();
+                    this.mobile.joystick.active = true;
+                    this.updateJoystick(e);
+                };
+                
+                const handleJoystickMove = (e) => {
+                    e.preventDefault();
+                    if (this.mobile.joystick.active) {
+                        this.updateJoystick(e);
+                    }
+                };
+                
+                const handleJoystickEnd = (e) => {
+                    e.preventDefault();
+                    this.mobile.joystick.active = false;
+                    this.mobile.joystick.x = 0;
+                    this.mobile.joystick.y = 0;
+                    joystickKnob.style.transform = 'translate(-50%, -50%)';
+                };
+                
+                joystick.addEventListener('touchstart', handleJoystickStart);
+                joystick.addEventListener('touchmove', handleJoystickMove);
+                joystick.addEventListener('touchend', handleJoystickEnd);
+                
+                shootBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.mobile.shooting = true;
+                });
+                
+                shootBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    this.mobile.shooting = false;
+                });
+            }
+            
+            updateJoystick(e) {
+                const rect = document.getElementById('joystick').getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+                
+                const touch = e.touches[0];
+                let deltaX = touch.clientX - centerX;
+                let deltaY = touch.clientY - centerY;
+                
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                const maxDistance = 40;
+                
+                if (distance > maxDistance) {
+                    deltaX = (deltaX / distance) * maxDistance;
+                    deltaY = (deltaY / distance) * maxDistance;
+                }
+                
+                this.mobile.joystick.x = deltaX / maxDistance;
+                this.mobile.joystick.y = deltaY / maxDistance;
+                
+                const knob = document.getElementById('joystickKnob');
+                knob.style.transform = `translate(${deltaX - 20}px, ${deltaY - 20}px)`;
+            }
+            
+            showStartScreen() {
+                document.getElementById('startScreen').style.display = 'block';
+                document.getElementById('gameOverScreen').style.display = 'none';
+            }
+            
+            startGame() {
+                document.getElementById('startScreen').style.display = 'none';
+                document.getElementById('gameOverScreen').style.display = 'none';
+                
+                this.gameRunning = true;
+                this.gameStarted = true;
+                this.startTime = Date.now();
+                this.lastTime = 0;
+                this.survivalTime = 0;
+                this.difficulty = 1;
+                
+                this.player = new Player(this.canvas.width / 2, this.canvas.height - 80);
+                this.enemies = [];
+                this.bullets = [];
+                this.enemyBullets = [];
+                this.obstacles = [];
+                this.particles = [];
+                
+                this.gameLoop();
+            }
+            
+            gameLoop() {
+                if (!this.gameRunning) return;
+                
+                const currentTime = Date.now();
+                const deltaTime = currentTime - this.lastTime;
+                this.lastTime = currentTime;
+                
+                this.update(deltaTime);
+                this.render();
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            update(deltaTime) {
+                this.survivalTime = (Date.now() - this.startTime) / 1000;
+                document.getElementById('timeDisplay').textContent = this.survivalTime.toFixed(1);
+                
+                this.difficulty = 1 + this.survivalTime * 0.1;
+                this.enemySpawnRate = 0.02 + this.survivalTime * 0.001;
+                
+                this.updatePlayer();
+                this.spawnEnemies();
+                this.spawnObstacles();
+                this.updateObjects();
+                this.checkCollisions();
+                this.cleanupObjects();
+            }
+            
+            updatePlayer() {
+                const speed = 5;
+                let dx = 0, dy = 0;
+                
+                if (this.keys['w'] || this.keys['ArrowUp']) dy -= speed;
+                if (this.keys['s'] || this.keys['ArrowDown']) dy += speed;
+                if (this.keys['a'] || this.keys['ArrowLeft']) dx -= speed;
+                if (this.keys['d'] || this.keys['ArrowRight']) dx += speed;
+                
+                if (this.mobile.joystick.active) {
+                    dx += this.mobile.joystick.x * speed;
+                    dy += this.mobile.joystick.y * speed;
+                }
+                
+                this.player.x += dx;
+                this.player.y += dy;
+                
+                this.player.x = Math.max(20, Math.min(this.canvas.width - 20, this.player.x));
+                this.player.y = Math.max(20, Math.min(this.canvas.height - 20, this.player.y));
+                
+                if (this.keys[' '] || this.keys['Space'] || this.mobile.shooting) {
+                    this.player.shoot();
+                }
+                
+                this.player.update();
+            }
+            
+            spawnEnemies() {
+                if (Math.random() < this.enemySpawnRate) {
+                    const x = Math.random() * (this.canvas.width - 40) + 20;
+                    const type = Math.floor(Math.random() * 3);
+                    this.enemies.push(new Enemy(x, -20, type));
+                }
+            }
+            
+            spawnObstacles() {
+                if (Math.random() < 0.005) {
+                    const x = Math.random() * (this.canvas.width - 60) + 30;
+                    this.obstacles.push(new Obstacle(x, -30));
+                }
+            }
+            
+            updateObjects() {
+                this.bullets = this.bullets.filter(bullet => {
+                    bullet.update();
+                    return bullet.y > -10;
+                });
+                
+                this.enemies = this.enemies.filter(enemy => {
+                    enemy.update();
+                    
+                    if (Math.random() < 0.02 * this.difficulty) {
+                        enemy.shoot(this.player);
+                    }
+                    
+                    return enemy.y < this.canvas.height + 50;
+                });
+                
+                this.enemyBullets = this.enemyBullets.filter(bullet => {
+                    bullet.update();
+                    return bullet.y < this.canvas.height + 10 && bullet.x > -10 && bullet.x < this.canvas.width + 10;
+                });
+                
+                this.obstacles = this.obstacles.filter(obstacle => {
+                    obstacle.update();
+                    return obstacle.y < this.canvas.height + 50;
+                });
+                
+                this.particles = this.particles.filter(particle => {
+                    particle.update();
+                    return particle.life > 0;
+                });
+            }
+            
+            checkCollisions() {
+                for (let bullet of this.enemyBullets) {
+                    if (this.checkCollision(this.player, bullet)) {
+                        this.gameOver();
+                        return;
+                    }
+                }
+                
+                for (let enemy of this.enemies) {
+                    if (this.checkCollision(this.player, enemy)) {
+                        this.gameOver();
+                        return;
+                    }
+                }
+                
+                for (let obstacle of this.obstacles) {
+                    if (this.checkCollision(this.player, obstacle)) {
+                        this.gameOver();
+                        return;
+                    }
+                }
+                
+                for (let i = this.bullets.length - 1; i >= 0; i--) {
+                    for (let j = this.enemies.length - 1; j >= 0; j--) {
+                        if (this.checkCollision(this.bullets[i], this.enemies[j])) {
+                            this.createExplosion(this.enemies[j].x, this.enemies[j].y);
+                            this.bullets.splice(i, 1);
+                            this.enemies.splice(j, 1);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            checkCollision(obj1, obj2) {
+                const dx = obj1.x - obj2.x;
+                const dy = obj1.y - obj2.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance < obj1.radius + obj2.radius;
+            }
+            
+            createExplosion(x, y) {
+                for (let i = 0; i < 8; i++) {
+                    this.particles.push(new Particle(x, y));
+                }
+            }
+            
+            cleanupObjects() {
+                this.bullets = this.bullets.filter(bullet => bullet.y > -10);
+                this.enemies = this.enemies.filter(enemy => enemy.y < this.canvas.height + 50);
+                this.enemyBullets = this.enemyBullets.filter(bullet => 
+                    bullet.y < this.canvas.height + 10 && bullet.x > -10 && bullet.x < this.canvas.width + 10
+                );
+                this.obstacles = this.obstacles.filter(obstacle => obstacle.y < this.canvas.height + 50);
+            }
+            
+            gameOver() {
+                this.gameRunning = false;
+                this.saveHighScore();
+                document.getElementById('finalTime').textContent = this.survivalTime.toFixed(1);
+                document.getElementById('finalHighScore').textContent = this.getHighScore().toFixed(1);
+                document.getElementById('gameOverScreen').style.display = 'block';
+            }
+            
+            saveHighScore() {
+                const highScore = this.getHighScore();
+                if (this.survivalTime > highScore) {
+                    // ローカルストレージの代わりにメモリ変数を使用
+                    this.highScore = this.survivalTime;
+                    document.getElementById('highScoreDisplay').textContent = this.survivalTime.toFixed(1);
+                }
+            }
+            
+            getHighScore() {
+                return this.highScore || 0;
+            }
+            
+            loadHighScore() {
+                document.getElementById('highScoreDisplay').textContent = this.getHighScore().toFixed(1);
+            }
+            
+            render() {
+                this.ctx.fillStyle = 'rgba(0, 0, 17, 0.3)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                this.renderBackground();
+                
+                this.player.render(this.ctx);
+                
+                this.bullets.forEach(bullet => bullet.render(this.ctx));
+                this.enemies.forEach(enemy => enemy.render(this.ctx));
+                this.enemyBullets.forEach(bullet => bullet.render(this.ctx));
+                this.obstacles.forEach(obstacle => obstacle.render(this.ctx));
+                this.particles.forEach(particle => particle.render(this.ctx));
+            }
+            
+            renderBackground() {
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                for (let i = 0; i < 50; i++) {
+                    const x = (i * 137 + this.survivalTime * 50) % this.canvas.width;
+                    const y = (i * 97 + this.survivalTime * 30) % this.canvas.height;
+                    this.ctx.fillRect(x, y, 1, 1);
+                }
+            }
+        }
+        
+        // ゲームの開始
+        let game;
+        
+        window.addEventListener('load', () => {
+            game = new Game();
+        });
+        
+        // タッチデバイスでのスクロール防止
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // コンテキストメニュー無効化
+        document.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+    </script>
+  </div>
+</body>
+</html>
